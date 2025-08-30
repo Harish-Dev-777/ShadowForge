@@ -406,7 +406,7 @@ export default function Hero() {
       )}
 
       {/* Gradient Overlays - Fixed to prevent white line */}
-      <div className="absolute top-0 inset-x-0 h-40 md:h-70 bg-gradient-to-b from-black to-transparent z-20"></div>
+      <div className="absolute top-0 inset-x-0 h-100 md:h-70 bg-gradient-to-b from-black to-transparent z-20"></div>
       <div className="absolute bottom-0 inset-x-0 h-40 md:h-70 bg-gradient-to-t from-black to-transparent z-20"></div>
       <div className="absolute left-0 inset-y-0 w-20 md:w-30 bg-gradient-to-r from-black to-transparent z-20"></div>
       <div className="absolute right-0 inset-y-0 w-20 md:w-30 bg-gradient-to-l from-black to-transparent z-20"></div>

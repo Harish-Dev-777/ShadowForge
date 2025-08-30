@@ -4,6 +4,8 @@ import Services from "../components/Services";
 import Team from "../components/Team";
 import Testimonials from "../components/Testimonials";
 import ContactInline from "../components/Contact";
+import FAQ from "../components/FAQ";
+import Footer from "../components/Footer";
 
 export default function Home() {
   return (
@@ -11,9 +13,11 @@ export default function Home() {
       <Hero />
       <ImageGrid />
       <Services />
+       <FAQ />
       <Team />
       <Testimonials />
       <ContactInline />
+      <Footer/>
     </>
   );
 }

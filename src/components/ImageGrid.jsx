@@ -1,277 +1,338 @@
-// src/components/ImageGrid.jsx
 import { useRef, useEffect, useState } from "react";
 import { siteContent } from "../contents";
 import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
 
 export default function ImageGrid() {
+  const containerRef = useRef();
   const wrapRef = useRef();
-  const tlRef = useRef();
-  const sectionRef = useRef();
+  const animationRef = useRef();
   const cardsRef = useRef([]);
-  const cometRefs = useRef([]);
-  const [windowSize, setWindowSize] = useState({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
   const [isHovered, setIsHovered] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [filteredProjects, setFilteredProjects] = useState([]);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [currentImage, setCurrentImage] = useState(null);
+  const [velocity, setVelocity] = useState(0);
+  const [lastX, setLastX] = useState(0);
+  const [lastTime, setLastTime] = useState(0);
 
+  // Check if mobile on mount and resize
   useEffect(() => {
-    const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
     };
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+
+    return () => {
+      window.removeEventListener("resize", checkMobile);
+    };
   }, []);
 
+  // Filter projects based on active filter
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      // Section entrance animation
-      gsap.fromTo(
-        sectionRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 1.2,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 85%",
-            toggleActions: "play none none none",
-          },
-        }
+    if (activeFilter === "all") {
+      setFilteredProjects(siteContent.projects);
+    } else {
+      setFilteredProjects(
+        siteContent.projects.filter(
+          (project) => project.tags && project.tags.includes(activeFilter)
+        )
       );
+    }
+  }, [activeFilter]);
 
-      // Title animation
-      gsap.fromTo(
-        ".grid-title",
-        { y: 40, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 1,
-          scrollTrigger: {
-            trigger: ".grid-title",
-            start: "top 85%",
-            toggleActions: "play none none none",
-          },
+  // Initialize animation
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap || filteredProjects.length === 0) return;
+
+    // Clear previous content
+    wrap.innerHTML = "";
+
+    // Create slides
+    const slides = filteredProjects.map((project, index) => {
+      const slide = document.createElement("div");
+      slide.className = `grid-card ${
+        isMobile ? "w-[180px] " : "w-[300px] md:w-[380px]"
+      } flex-shrink-0 rounded-2xl overflow-hidden bg-white/5 backdrop-blur-md border border-white/10 shadow-xl transition-all duration-300 group relative`;
+
+      slide.innerHTML = `
+        <div class="absolute inset-0 bg-gradient-to-br from-transparent via-purple-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl z-0"></div>
+        <div class="overflow-hidden relative z-10">
+          <img
+            src="${project.image}"
+            alt="${project.title}"
+            class="w-full h-48 md:h-60 object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+          <div class="absolute inset-0 bg-gradient-to-t from-gray-900/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        </div>
+        <div class="p-4 md:p-5 relative z-10">
+          <h3 class="font-semibold text-white text-base md:text-lg mb-1 md:mb-2 line-clamp-1">${
+            project.title
+          }</h3>
+          <p class="text-gray-400 text-xs md:text-sm line-clamp-2 md:line-clamp-none">${
+            project.description
+          }</p>
+          ${
+            project.tags && project.tags.length > 0
+              ? `
+            <div class="mt-3 md:mt-4 flex flex-wrap gap-1 md:gap-2">
+              ${project.tags
+                .slice(0, isMobile ? 2 : 3)
+                .map(
+                  (tag) => `
+                <span class="text-xs bg-purple-900/30 text-purple-200 px-2 py-1 rounded-full">${tag}</span>
+              `
+                )
+                .join("")}
+              ${
+                project.tags.length > (isMobile ? 2 : 3)
+                  ? `
+                <span class="text-xs bg-gray-800/30 text-gray-400 px-2 py-1 rounded-full">
+                  +${project.tags.length - (isMobile ? 2 : 3)}
+                </span>
+              `
+                  : ""
+              }
+            </div>
+          `
+              : ""
+          }
+          <button class="mt-3 md:mt-4 text-xs md:text-sm text-purple-400 hover:text-purple-300 transition-all flex items-center view-project-btn" data-index="${index}">
+            View Project
+            <svg class="w-3 h-3 md:w-4 md:h-4 ml-1 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="absolute inset-0 bg-gradient-to-b from-transparent via-purple-900/10 to-purple-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl z-0"></div>
+        <div class="comet-trail absolute pointer-events-none z-5 w-[100px] h-[100px] bg-radial-gradient from-purple-500/60 via-transparent to-transparent rounded-full filter blur-[10px] opacity-0"></div>
+      `;
+
+      return slide;
+    });
+
+    // Double the content for seamless looping
+    const originalContent = slides.map((slide) => slide.outerHTML).join("");
+    wrap.innerHTML = originalContent + originalContent;
+
+    // Add event listeners to the new buttons
+    setTimeout(() => {
+      const buttons = wrap.querySelectorAll(".view-project-btn");
+      buttons.forEach((button) => {
+        button.addEventListener("click", (e) => {
+          const index = parseInt(e.currentTarget.getAttribute("data-index"));
+          openLightbox(index);
+        });
+      });
+
+      // Add mouse wheel event for horizontal scrolling
+      const container = containerRef.current;
+      if (container) {
+        container.addEventListener("wheel", handleWheel, { passive: false });
+      }
+    }, 0);
+
+    const newSlides = gsap.utils.toArray(wrap.children);
+    const gap = isMobile ? 16 : 24;
+    const totalWidth =
+      newSlides.reduce((acc, child) => acc + child.offsetWidth + gap, 0) - gap;
+
+    // Set container width
+    wrap.style.width = `${totalWidth}px`;
+
+    // Create the infinite scroll animation
+    const animate = () => {
+      if (isHovered || isDragging) {
+        // Apply momentum scrolling after drag
+        if (Math.abs(velocity) > 0.1) {
+          const deceleration = 0.95;
+          const newVelocity = velocity * deceleration;
+          setVelocity(newVelocity);
+
+          const currentX = parseFloat(
+            wrap.style.transform
+              ?.replace("translateX(", "")
+              .replace("px)", "") || 0
+          );
+          const newX = currentX + newVelocity;
+
+          // Reset position when scrolled halfway
+          if (Math.abs(newX) >= totalWidth / 2) {
+            wrap.style.transform = `translateX(0px)`;
+          } else {
+            wrap.style.transform = `translateX(${newX}px)`;
+          }
         }
-      );
+      } else {
+        // Auto-scroll when not interacting
+        const currentX = parseFloat(
+          wrap.style.transform?.replace("translateX(", "").replace("px)", "") ||
+            0
+        );
+        let newX = currentX - (isMobile ? 0.8 : 1);
 
-      // Description animation
-      gsap.fromTo(
-        ".grid-description",
-        { y: 30, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.9,
-          delay: 0.2,
-          scrollTrigger: {
-            trigger: ".grid-description",
-            start: "top 85%",
-            toggleActions: "play none none none",
-          },
+        // Reset position when scrolled halfway
+        if (Math.abs(newX) >= totalWidth / 2) {
+          newX = 0;
         }
-      );
 
-      // Card animations
-      gsap.fromTo(
-        cardsRef.current,
-        {
-          y: 60,
-          opacity: 0,
-          scale: 0.9,
-        },
-        {
-          y: 0,
-          opacity: 1,
-          scale: 1,
-          duration: 1,
-          stagger: 0.1,
-          ease: "back.out(1.2)",
-          scrollTrigger: {
-            trigger: ".grid-card",
-            start: "top 85%",
-            toggleActions: "play none none none",
-          },
-        }
-      );
+        wrap.style.transform = `translateX(${newX}px)`;
+      }
 
-      // Setup horizontal scroll for all devices
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    // Start animation
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+
+      const container = containerRef.current;
+      if (container) {
+        container.removeEventListener("wheel", handleWheel);
+      }
+    };
+  }, [isHovered, isDragging, isMobile, filteredProjects, velocity]);
+
+  // Handle mouse wheel for horizontal scrolling
+  const handleWheel = (e) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      // Prevent vertical scrolling if we're scrolling horizontally
+      e.preventDefault();
+
       const wrap = wrapRef.current;
       if (!wrap) return;
 
-      const slides = gsap.utils.toArray(wrap.children);
-      const gap = 24;
-
-      // Clear any existing clones to avoid duplication
-      while (wrap.children.length > slides.length) {
-        wrap.removeChild(wrap.lastChild);
-      }
-
-      // Duplicate slides for seamless infinite scroll
-      slides.forEach((sl) => wrap.appendChild(sl.cloneNode(true)));
-
-      // Calculate total width of original slides
-      const totalWidth = slides.reduce(
-        (acc, child) => acc + child.offsetWidth + gap,
-        0
+      const currentX = parseFloat(
+        wrap.style.transform?.replace("translateX(", "").replace("px)", "") || 0
       );
+      const newX = currentX - e.deltaY * 0.8;
 
-      // Set container width explicitly
-      wrap.style.width = `${totalWidth * 2}px`;
+      wrap.style.transform = `translateX(${newX}px)`;
 
-      // Reset position to avoid jumpiness
-      gsap.set(wrap, { x: 0 });
+      // Set velocity for momentum scrolling
+      setVelocity(-e.deltaY * 0.8);
+    }
+  };
 
-      // GSAP continuous horizontal scroll
-      tlRef.current = gsap.to(wrap, {
-        x: `-=${totalWidth}`,
-        duration: 40,
-        ease: "none",
-        repeat: -1,
-        modifiers: {
-          x: gsap.utils.unitize((x) => parseFloat(x) % totalWidth),
-        },
-      });
+  // Handle mouse events for manual scrolling
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setStartX(e.pageX - containerRef.current.offsetLeft);
+    setScrollLeft(
+      parseFloat(
+        wrapRef.current.style.transform
+          ?.replace("translateX(", "")
+          .replace("px)", "")
+      ) || 0
+    );
+    setVelocity(0);
+    setLastX(e.pageX);
+    setLastTime(performance.now());
+  };
 
-      // Pause on hover for all devices
-      const handleMouseEnter = () => {
-        setIsHovered(true);
-        if (tlRef.current) tlRef.current.pause();
-      };
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setIsDragging(false);
+  };
 
-      const handleMouseLeave = () => {
-        setIsHovered(false);
-        if (tlRef.current) tlRef.current.play();
-      };
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
 
-      // Dragging functionality for desktop
-      if (windowSize.width > 768) {
-        let isDown = false;
-        let startX;
-        let scrollLeft;
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
 
-        const handleMouseDown = (e) => {
-          isDown = true;
-          startX = e.pageX - wrap.offsetLeft;
-          scrollLeft = wrap.scrollLeft;
-        };
+    const currentTime = performance.now();
+    const currentX = e.pageX;
+    const deltaX = currentX - lastX;
+    const deltaTime = currentTime - lastTime;
 
-        const handleMouseUp = () => {
-          isDown = false;
-        };
+    // Calculate velocity for momentum scrolling
+    if (deltaTime > 0) {
+      const newVelocity = (deltaX / deltaTime) * 16;
+      setVelocity(newVelocity);
+    }
 
-        const handleMouseMove = (e) => {
-          if (!isDown) return;
-          e.preventDefault();
-          const x = e.pageX - wrap.offsetLeft;
-          const walk = (x - startX) * 2;
-          wrap.scrollLeft = scrollLeft - walk;
-        };
+    setLastX(currentX);
+    setLastTime(currentTime);
 
-        wrap.addEventListener("mousedown", handleMouseDown);
-        wrap.addEventListener("mouseup", handleMouseUp);
-        wrap.addEventListener("mousemove", handleMouseMove);
+    const x = e.pageX - containerRef.current.offsetLeft;
+    const walk = (x - startX) * 2; // Scroll multiplier
 
-        return () => {
-          wrap.removeEventListener("mousedown", handleMouseDown);
-          wrap.removeEventListener("mouseup", handleMouseUp);
-          wrap.removeEventListener("mousemove", handleMouseMove);
-        };
-      } else {
-        // For mobile and tablet, enable manual scrolling
-        wrap.style.overflowX = "auto";
-        wrap.style.cursor = "grab";
-
-        // Add momentum scrolling for mobile
-        let startX, scrollLeft, isScrolling;
-
-        const handleTouchStart = (e) => {
-          startX = e.touches[0].pageX - wrap.offsetLeft;
-          scrollLeft = wrap.scrollLeft;
-          isScrolling = true;
-          if (tlRef.current) tlRef.current.pause();
-        };
-
-        const handleTouchMove = (e) => {
-          if (!isScrolling) return;
-          e.preventDefault();
-          const x = e.touches[0].pageX - wrap.offsetLeft;
-          const walk = (x - startX) * 2;
-          wrap.scrollLeft = scrollLeft - walk;
-        };
-
-        const handleTouchEnd = () => {
-          isScrolling = false;
-          // Resume auto-scroll after a delay if not hovering
-          setTimeout(() => {
-            if (!isHovered && tlRef.current) tlRef.current.play();
-          }, 2000);
-        };
-
-        wrap.addEventListener("touchstart", handleTouchStart);
-        wrap.addEventListener("touchmove", handleTouchMove);
-        wrap.addEventListener("touchend", handleTouchEnd);
-
-        return () => {
-          wrap.removeEventListener("touchstart", handleTouchStart);
-          wrap.removeEventListener("touchmove", handleTouchMove);
-          wrap.removeEventListener("touchend", handleTouchEnd);
-        };
-      }
-
-      wrap.addEventListener("mouseenter", handleMouseEnter);
-      wrap.addEventListener("mouseleave", handleMouseLeave);
-
-      return () => {
-        if (tlRef.current) tlRef.current.kill();
-        wrap.removeEventListener("mouseenter", handleMouseEnter);
-        wrap.removeEventListener("mouseleave", handleMouseLeave);
-      };
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, [windowSize.width, isHovered]);
-
-  // Initialize comet elements for each card
-  useEffect(() => {
-    cometRefs.current = cometRefs.current.slice(0, cardsRef.current.length);
-
-    cardsRef.current.forEach((card, index) => {
-      if (card && !card.querySelector(".comet-trail")) {
-        const comet = document.createElement("div");
-        comet.className = "comet-trail";
-        comet.style.cssText = `
-          position: absolute;
-          width: 120px;
-          height: 120px;
-          pointer-events: none;
-          z-index: 2;
-          background: radial-gradient(circle, rgba(168, 85, 247, 0.7) 0%, transparent 70%);
-          border-radius: 50%;
-          filter: blur(15px);
-          opacity: 0;
-          transform: translate(-50%, -50%);
-        `;
-        card.style.position = "relative";
-        card.style.overflow = "hidden";
-        card.appendChild(comet);
-        cometRefs.current[index] = comet;
-      }
+    // Apply smooth scrolling with easing
+    gsap.to(wrapRef.current, {
+      x: scrollLeft + walk,
+      duration: 0.1,
+      ease: "power1.out",
+      overwrite: true,
     });
-  }, [siteContent.projects]);
+  };
 
-  // Enhanced comet card hover effect
+  // Handle touch events for mobile
+  const handleTouchStart = (e) => {
+    setIsDragging(true);
+    setStartX(e.touches[0].pageX - containerRef.current.offsetLeft);
+    setScrollLeft(
+      parseFloat(
+        wrapRef.current.style.transform
+          ?.replace("translateX(", "")
+          .replace("px)", "")
+      ) || 0
+    );
+    setVelocity(0);
+    setLastX(e.touches[0].pageX);
+    setLastTime(performance.now());
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
+
+    const currentTime = performance.now();
+    const currentX = e.touches[0].pageX;
+    const deltaX = currentX - lastX;
+    const deltaTime = currentTime - lastTime;
+
+    // Calculate velocity for momentum scrolling
+    if (deltaTime > 0) {
+      const newVelocity = (deltaX / deltaTime) * 16;
+      setVelocity(newVelocity);
+    }
+
+    setLastX(currentX);
+    setLastTime(currentTime);
+
+    const x = e.touches[0].pageX - containerRef.current.offsetLeft;
+    const walk = (x - startX) * 2;
+
+    // Apply smooth scrolling with easing
+    gsap.to(wrapRef.current, {
+      x: scrollLeft + walk,
+      duration: 0.1,
+      ease: "power1.out",
+      overwrite: true,
+    });
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
+  // Comet card hover effect
   const handleCardHover = (e, index) => {
+    if (isMobile) return; // Disable hover effects on mobile
+
     const card = e.currentTarget;
     if (!card) return;
 
@@ -283,157 +344,273 @@ export default function ImageGrid() {
       ease: "power2.out",
     });
 
-    // Get comet element
-    const comet = card.querySelector(".comet-trail");
-    if (!comet) return;
-
-    // Calculate position
+    // Create comet trail effect
     const rect = card.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Position comet at cursor
-    gsap.set(comet, {
-      x: x,
-      y: y,
-      opacity: 0,
-      scale: 0,
-    });
+    // Create comet element if it doesn't exist
+    let comet = card.querySelector(".comet-trail");
+    if (!comet) {
+      comet = document.createElement("div");
+      comet.className = "comet-trail";
+      card.appendChild(comet);
+    }
 
-    // Animate comet trail across the card
-    const angle = Math.atan2(y - rect.height / 2, x - rect.width / 2);
-    const distance = Math.sqrt(
-      Math.pow(rect.width, 2) + Math.pow(rect.height, 2)
-    );
-    const targetX = x + Math.cos(angle) * distance;
-    const targetY = y + Math.sin(angle) * distance;
-
-    gsap.to(comet, {
-      x: targetX,
-      y: targetY,
-      scale: 2,
-      opacity: 1,
-      duration: 0.8,
-      ease: "power2.out",
-      onComplete: () => {
-        gsap.to(comet, {
-          opacity: 0,
-          duration: 0.3,
-        });
+    // Animate comet trail
+    gsap.fromTo(
+      comet,
+      {
+        x: x - 50,
+        y: y - 50,
+        scale: 0,
+        opacity: 1,
       },
-    });
-
-    // Slightly scale down other cards
-    cardsRef.current.forEach((otherCard, i) => {
-      if (i !== index && otherCard) {
-        gsap.to(otherCard, {
-          scale: 0.98,
-          duration: 0.3,
-          ease: "power2.out",
-        });
+      {
+        x: x + 100,
+        y: y + 100,
+        scale: 2,
+        opacity: 0,
+        duration: 0.8,
+        ease: "power2.out",
       }
-    });
+    );
   };
 
   const handleCardLeave = (e, index) => {
+    if (isMobile) return;
+
     const card = e.currentTarget;
     if (!card) return;
 
-    // Reset all cards to normal state
+    // Reset card to normal state
     gsap.to(card, {
       scale: 1,
       zIndex: 1,
       duration: 0.5,
       ease: "power2.out",
     });
-
-    // Reset other cards
-    cardsRef.current.forEach((otherCard, i) => {
-      if (i !== index && otherCard) {
-        gsap.to(otherCard, {
-          scale: 1,
-          duration: 0.5,
-          ease: "power2.out",
-        });
-      }
-    });
-
-    // Hide comet
-    const comet = card.querySelector(".comet-trail");
-    if (comet) {
-      gsap.to(comet, {
-        opacity: 0,
-        duration: 0.2,
-      });
-    }
   };
 
+  // Open lightbox with project details
+  const openLightbox = (index) => {
+    setCurrentImage(filteredProjects[index]);
+    setShowLightbox(true);
+    document.body.style.overflow = "hidden"; // Prevent background scrolling
+  };
+
+  // Close lightbox
+  const closeLightbox = () => {
+    setShowLightbox(false);
+    setCurrentImage(null);
+    document.body.style.overflow = "auto"; // Re-enable scrolling
+  };
+
+  // Navigate between images in lightbox
+  const navigateLightbox = (direction) => {
+    if (!currentImage) return;
+
+    const currentIndex = filteredProjects.findIndex(
+      (project) => project.id === currentImage.id
+    );
+    let newIndex;
+
+    if (direction === "next") {
+      newIndex = (currentIndex + 1) % filteredProjects.length;
+    } else {
+      newIndex =
+        (currentIndex - 1 + filteredProjects.length) % filteredProjects.length;
+    }
+
+    setCurrentImage(filteredProjects[newIndex]);
+  };
+
+  // Handle keyboard navigation in lightbox
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!showLightbox) return;
+
+      if (e.key === "Escape") {
+        closeLightbox();
+      } else if (e.key === "ArrowRight") {
+        navigateLightbox("next");
+      } else if (e.key === "ArrowLeft") {
+        navigateLightbox("prev");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showLightbox, currentImage]);
+
+  // Get unique tags from all projects
+  const allTags = [
+    ...new Set(siteContent.projects.flatMap((project) => project.tags || [])),
+  ];
+
   return (
-    <section
-      ref={sectionRef}
-      id="image-grid"
-      className="py-20 md:py-24 bg-gray-900 relative overflow-hidden"
-    >
+    <section className="py-16 md:py-24 bg-gray-900 relative overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden z-0">
         <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-purple-900/5 rounded-full blur-3xl"></div>
         <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-800/5 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="text-center mb-12 px-4 relative z-10">
-        <h2 className="grid-title text-3xl md:text-4xl font-bold text-white">
-          Our Work
-        </h2>
-        <p className="grid-description text-gray-400 mt-2 max-w-2xl mx-auto">
+      <div className="text-center mb-10 md:mb-12 px-4 relative z-10">
+        <h2 className="text-2xl md:text-4xl font-bold text-white">Our Work</h2>
+        <p className="text-gray-400 mt-2 max-w-2xl mx-auto text-sm md:text-base">
           A showcase of projects we've forged into reality with innovation and
           precision.
         </p>
+
+        {/* Filter buttons */}
+        <div className="mt-6 flex flex-wrap justify-center gap-2 md:gap-3">
+          <button
+            className={`px-3 py-1 md:px-4 md:py-2 rounded-full text-xs md:text-sm transition-all ${
+              activeFilter === "all"
+                ? "bg-purple-600 text-white"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+            }`}
+            onClick={() => setActiveFilter("all")}
+          >
+            All Projects
+          </button>
+
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              className={`px-3 py-1 md:px-4 md:py-2 rounded-full text-xs md:text-sm transition-all ${
+                activeFilter === tag
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+              }`}
+              onClick={() => setActiveFilter(tag)}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="relative overflow-hidden px-4">
+      <div
+        ref={containerRef}
+        className="relative overflow-hidden px-4 md:px-6"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={handleMouseLeave}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         {/* Gradient overlays for belt-style effect */}
-        <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-gray-900 to-transparent z-20 pointer-events-none"></div>
-        <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-gray-900 to-transparent z-20 pointer-events-none"></div>
+        <div className="absolute left-0 top-0 bottom-0 w-12 md:w-20 bg-gradient-to-r from-gray-900 to-transparent z-20 pointer-events-none"></div>
+        <div className="absolute right-0 top-0 bottom-0 w-12 md:w-20 bg-gradient-to-l from-gray-900 to-transparent z-20 pointer-events-none"></div>
 
-        <div
-          ref={wrapRef}
-          className="flex gap-6 will-change-transform scroll-hide"
-          style={{ overflowX: windowSize.width <= 768 ? "auto" : "hidden" }}
-        >
-          {siteContent.projects.map((p, index) => (
-            <div
-              key={p.id}
-              ref={(el) => (cardsRef.current[index] = el)}
-              className="grid-card w-[300px] md:w-[380px] flex-shrink-0 rounded-2xl overflow-hidden bg-white/5 backdrop-blur-md border border-white/10 shadow-xl transition-all duration-300 group relative"
-              onMouseMove={(e) => handleCardHover(e, index)}
-              onMouseLeave={(e) => handleCardLeave(e, index)}
+        {filteredProjects.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            No projects found for this filter.
+          </div>
+        ) : (
+          <div
+            ref={wrapRef}
+            className="flex gap-4 md:gap-6 will-change-transform"
+          >
+            {/* Content will be populated by useEffect */}
+          </div>
+        )}
+      </div>
+
+      {/* Scroll indicator */}
+      <div className="text-center mt-6 text-gray-500 text-sm animate-pulse px-4">
+        <span className="inline-block mr-2">←</span>
+        {isMobile
+          ? "Swipe to scroll • Auto-scrolls when idle"
+          : "Hover to pause • Drag to scroll • Use mouse wheel"}
+        <span className="inline-block ml-2">→</span>
+      </div>
+
+      {/* Lightbox Modal */}
+      {showLightbox && currentImage && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 md:p-8">
+          <div className="relative max-w-4xl w-full max-h-full overflow-auto">
+            <button
+              className="absolute top-4 right-4 z-10 text-white bg-black/50 rounded-full p-2 hover:bg-black/70 transition-colors"
+              onClick={closeLightbox}
             >
-              {/* Border gradient effect */}
-              <div className="absolute inset-0 bg-gradient-to-br from-transparent via-purple-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl z-0"></div>
-
-              <div className="overflow-hidden relative z-10">
-                <img
-                  src={p.image}
-                  alt={p.title}
-                  className="w-full h-60 object-cover transition-transform duration-500 group-hover:scale-110"
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
                 />
-                {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-gray-900/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              </div>
+              </svg>
+            </button>
 
-              <div className="p-5 relative z-10">
-                <h3 className="font-semibold text-white text-lg mb-2">
-                  {p.title}
+            <button
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 text-white bg-black/50 rounded-full p-2 hover:bg-black/70 transition-colors"
+              onClick={() => navigateLightbox("prev")}
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+            </button>
+
+            <button
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 text-white bg-black/50 rounded-full p-2 hover:bg-black/70 transition-colors"
+              onClick={() => navigateLightbox("next")}
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+
+            <div className="bg-gray-800 rounded-lg overflow-hidden">
+              <img
+                src={currentImage.image}
+                alt={currentImage.title}
+                className="w-full h-auto max-h-[60vh] object-contain"
+              />
+
+              <div className="p-6">
+                <h3 className="text-2xl font-bold text-white mb-2">
+                  {currentImage.title}
                 </h3>
-                <p className="text-gray-400 text-sm">{p.description}</p>
+                <p className="text-gray-300 mb-4">{currentImage.description}</p>
 
-                {/* Safely render tags only if they exist */}
-                {p.tags && p.tags.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {p.tags.map((tag, index) => (
+                {currentImage.tags && currentImage.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {currentImage.tags.map((tag) => (
                       <span
-                        key={index}
-                        className="text-xs bg-purple-900/30 text-purple-200 px-2 py-1 rounded-full"
+                        key={tag}
+                        className="text-sm bg-purple-900/30 text-purple-200 px-3 py-1 rounded-full"
                       >
                         {tag}
                       </span>
@@ -441,63 +618,55 @@ export default function ImageGrid() {
                   </div>
                 )}
 
-                <button className="mt-4 text-sm text-purple-400 hover:text-purple-300 transition-all flex items-center">
-                  View Project
-                  <svg
-                    className="w-4 h-4 ml-1 transition-transform duration-300 group-hover:translate-x-1"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                {currentImage.link && (
+                  <a
+                    href={currentImage.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M14 5l7 7m0 0l-7 7m7-7H3"
-                    ></path>
-                  </svg>
-                </button>
+                    Visit Live Site
+                    <svg
+                      className="w-4 h-4 ml-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                      />
+                    </svg>
+                  </a>
+                )}
               </div>
-
-              {/* Hover gradient effect */}
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-900/10 to-purple-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl z-0"></div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Navigation dots for mobile */}
-      {windowSize.width <= 768 && (
-        <div className="flex justify-center mt-8 space-x-2">
-          {siteContent.projects.map((_, index) => (
-            <div key={index} className="w-2 h-2 bg-gray-600 rounded-full"></div>
-          ))}
+          </div>
         </div>
       )}
 
-      {/* Scroll indicator for horizontal scroll */}
-      <div className="text-center mt-6 text-gray-500 text-sm animate-pulse">
-        <span className="inline-block mr-2">←</span>
-        {windowSize.width > 768
-          ? "Hover to pause • Scroll to explore"
-          : "Swipe to explore"}
-        <span className="inline-block ml-2">→</span>
-      </div>
-
-      {/* Hide scrollbar */}
+      {/* Custom styles */}
       <style jsx>{`
-        .scroll-hide::-webkit-scrollbar {
-          display: none;
+        .bg-radial-gradient {
+          background: radial-gradient(
+            circle,
+            rgba(168, 85, 247, 0.6) 0%,
+            transparent 70%
+          );
         }
-        .scroll-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
+        .line-clamp-1 {
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
-
-        @media (max-width: 768px) {
-          .grid-card {
-            width: 280px !important;
-          }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
       `}</style>
     </section>
