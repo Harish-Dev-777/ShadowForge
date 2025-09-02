@@ -755,7 +755,7 @@ export default function ContactInline() {
             <form onSubmit={submit} className="space-y-6">
               <div className="form-element">
                 <label className="text-sm block mb-2 text-gray-300 font-medium tracking-wider">
-                  DESIGNATION / NAME *
+                  NAME & DESIGNATION  *
                 </label>
                 <input
                   ref={(el) => (inputRefs.current[0] = el)}
@@ -802,7 +802,7 @@ export default function ContactInline() {
 
               <div className="form-element">
                 <label className="text-sm block mb-2 text-gray-300 font-medium tracking-wider">
-                  CONTACT CHANNEL *
+                  CONTACT NUMBER *
                 </label>
                 <input
                   ref={(el) => {
@@ -830,7 +830,7 @@ export default function ContactInline() {
 
               <div className="form-element">
                 <label className="text-sm block mb-2 text-gray-300 font-medium tracking-wider">
-                  PROJECT PARAMETERS *
+                  PROJECT DETAILS *
                 </label>
                 <textarea
                   ref={(el) => (inputRefs.current[3] = el)}
